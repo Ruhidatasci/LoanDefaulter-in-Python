@@ -1,0 +1,249 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Feb  7 09:30:48 2019
+
+@author: Admin
+"""
+
+import pandas as pd
+myfile = pd.read_csv("Downloads\\PerformanceProcessed.csv")
+type(myfile)
+#file description
+myfile.describe()
+myfile.head(10)
+myfile.tail(10)
+myfile.columns
+myfile.info()
+#removing duplicates
+myfile = myfile.drop_duplicates()
+#observation of the counts of different features
+myfile.FinanceAmt.value_counts(dropna = False)
+myfile.Instalment.value_counts(dropna = False)
+myfile.BrandTypeName.value_counts(dropna = False)
+myfile.LoanTypeName.value_counts(dropna = False) #remove car, bus and Null value 
+#changing file column name for better access
+myfile.columns = ['StateName', 'HubName', 'LocationName', 'BrandTypeName', 'LoanTypeName','FinanceAmt', 'Instalment', 'LoanDuration', 'Defaulter']
+myfile.LoanDuration.value_counts(dropna = False)
+myfile.LoanTypeName.tail(10)
+
+#2nd, 3rd and 4th business moment
+myfile.kurt()
+myfile.skew()
+myfile.std()
+myfile.var()
+
+#Graphical Analysis
+import matplotlib.pyplot as plt
+myfile.FinanceAmt.plot(kind = "box")
+myfile.Instalment.plot(kind = "box")
+myfile.plot(kind = "box")
+myfile.plot(kind = "scatter",x = "Instalment",y = "FinanceAmt")
+myfile.plot(kind = "scatter",x = "LoanDuration",y = "FinanceAmt")#amount and duration have weak correlation
+
+"""Scatter Plot"""
+import seaborn as sns
+sns.pairplot(myfile, kind = "reg")
+sns.pairplot(myfile)
+pd.tools.plotting.scatter_matrix(myfile) #this provides all the plots in matrix table format
+#correlation
+myfile.corr()
+####Data cleaning
+myfile = myfile.sort_values('LoanTypeName')
+#arranging index in order 0 to 486779
+myfile.index = range(412732)
+#now removing unnecessary data from the data set as we are interested in only two wheeler, three wheeler & agricultural vehicle
+myfile = myfile.iloc[8290:412732,:]
+help(drop)
+myfile.index = range(404442)
+myfile.isnull().sum() #remove null value 
+myfile[myfile ['LoanTypeName'].isnull()].index.tolist()
+myfile = myfile.drop(myfile[myfile ['LoanTypeName'].isnull()].index.tolist(), axis = 0)
+myfile.LoanTypeName.tail()
+myfile.LoanTypeName.tail()
+#here after all Null values dropped
+myfile.isnull().sum()
+
+#Analysing Brand type, combining Brands of same type
+from sklearn.preprocessing import scale 
+#def norm_func(i):
+    #x = (i-i.min())	/	(i.max()	-	i.min())
+    #return (x)
+myfilenormal = pd.DataFrame(scale(myfile.iloc[:,5:8]))
+myfilenormal.columns = ['FinanceAmt', 'Instalment', 'LoanDuration']
+type(myfilenormal)
+#concat myfile new and normalize data columns
+data_final = pd.concat([myfile.iloc[:,:5],myfilenormal,myfile.iloc[:,8]],axis = 1)
+Train = data_final.iloc[:283109,:]
+Test = data_final.iloc[283109:,:]
+###############################pca technique##########################################
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import numpy as np
+#from sklearn.preprocessing import scale 
+pca = PCA()
+pca_Train = pca.fit_transform(Train.iloc[:,5:8])
+var = pca.explained_variance_ratio_
+pca.components_[0]
+Test.tail(2)
+# Cumulative variance 
+var1 = np.cumsum(np.round(var,decimals = 4)*100)
+var1
+plt.plot(var1,color="red")
+new_df = pd.DataFrame(pca_Train[:,0:2])
+data_Train = pd.concat([Train.iloc[:,[0,1,2,3,4,8]],new_df],axis =1)
+#PCA for test data
+pca1 = PCA()
+pca_Test = pca1.fit_transform(Test.iloc[:,5:8])
+varT = pca1.explained_variance_ratio_
+varT
+var2 = np.cumsum(np.round(var,decimals = 4)*100)
+var2
+plt.plot(var2,color="red")
+new_df.tail()
+new_df_test.head()
+new_df_test = pd.DataFrame(pca_Test[:,0:2])
+concatdata = Test.iloc[:,[0,1,2,3,4,8]]
+new_df_test.index = range(283109,404441)
+data_Test = pd.concat([concatdata,new_df_test],axis =1)
+
+#let us concat data_Test and data_Train
+final_loan = pd.concat([data_Train,data_Test],axis = 0)
+final_loan = final_loan.rename(columns = {0:"Comp1", 1: "Comp2"}) #renaming specific columns
+###########Decision Tree###########
+
+#Predictor = [to_numeric(i) for i in Predictor]
+type(final_loan)
+final_loan.info()
+final_loan = final_loan.astype("category")
+cat_columns = final_loan.select_dtypes(["category"]).columns
+cat_columns
+final_loan[cat_columns] = final_loan[cat_columns].apply(lambda x: x.cat.codes)
+final_loan.head()
+from sklearn.model_selection import train_test_split
+trainA, testB = train_test_split(final_loan, test_size = 0.3)
+from sklearn.tree import DecisionTreeClassifier
+model = DecisionTreeClassifier(criterion = "entropy")
+colnames = list(final_loan.columns)
+Target = colnames[5]
+Predictor = colnames[:5] + colnames[6:]
+DT = model.fit(trainA[Predictor],trainA[Target])
+pred_DT = DT.predict(testB[Predictor])
+np.mean(testB[Target]==pred_DT) #57%
+final_loan.info()
+#final_loan = final_loan.convert_objects(convert_numeric =True)
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold #for k-fold
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn import metrics
+
+Colnames = list(data.columns)
+
+
+
+
+#Generic function to be used
+def classification_model(model, data, predictors, outcome):
+  #Fit the model:
+  model.fit(data[predictors],data[outcome])
+  
+  #Make predictions on training set:
+  predictions = model.predict(data[predictors])
+  
+  #Print accuracy
+  accuracy = metrics.accuracy_score(predictions,data[outcome])
+  print ("Accuracy : %s" % "{0:.3%}".format(accuracy))
+
+  #Perform k-fold cross-validation with 5 folds
+  kf = KFold(n_splits=5)
+  error = []
+  for train, test in kf.split(data[predictors]):
+    # Filter training data
+    train_predictors = (data[predictors].iloc[train,:])
+    
+    # The target we're using to train the algorithm.
+    train_target = data[outcome].iloc[train]
+    
+    # Training the algorithm using the predictors and target.
+    model.fit(train_predictors, train_target)
+    
+    #Record error from each cross-validation run
+    error.append(model.score(data[predictors].iloc[test,:], data[outcome].iloc[test]))
+ 
+  print ("Cross-Validation Score : %s" % "{0:.3%}".format(np.mean(error)))
+
+  #Fit the model again so that it can be refered outside the function:
+  model.fit(data[predictors],data[outcome]) 
+
+###Regularization technique
+#logistic regression
+classification_model(LogisticRegression(),final_loan,Predictor,Target) #57.66%
+final_loan.isnull().sum()
+#K Neighrest neighbours
+from sklearn.neighbors import KNeighborsClassifier as KNC
+neigh = KNC(n_neighbors = 21)
+classification_model(neigh,final_loan,Predictor,Target) #58.99%
+#decision tree
+model1 = DecisionTreeClassifier(criterion = "entropy")
+classification_model(model1,final_loan,Predictor,Target) #95.971%,56.043%
+#naive bayes
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import MultinomialNB
+classification_model(GaussianNB(),final_loan,Predictor,Target) #51.841
+classification_model(MultinomialNB(),final_loan,Predictor,Target) #52.530
+
+#####
+acc = []
+
+for i in range(3,200,2):
+    trainA, testA = train_test_split(final_loan, test_size = 0.3)
+    neigh = KNC(n_neighbors = i)
+    neigh.fit(trainA[Predictor],trainA[Target])
+    accT = np.mean(neigh.predict(trainA[Predictor])==trainA[Target]) 
+    accTest = np.mean(neigh.predict(testA[Predictor])==testA[Target])
+    acc.append([accT,accTest])
+np.mean(acc) #0.639
+#KNN Model
+acc = []
+
+for i in range(3,200,2):
+    trainA, testA = train_test_split(final_loan, test_size = 0.3)
+    neigh = KNC(n_neighbors = i)
+    neigh.fit(trainA[Predictor],trainA[Target])
+    accT = np.mean(neigh.predict(trainA[Predictor])==trainA[Target]) 
+    accTest = np.mean(neigh.predict(testA[Predictor])==testA[Target])
+    acc.append([accT,accTest])
+ #Decision tree model   
+acc = []    
+for i in range(3,14,2):
+    trainA, testA = train_test_split(final_loan, test_size = 0.3)
+    modelDecision = DecisionTreeClassifier(criterion = "entropy")
+    DT = modelDecision.fit(trainA[Predictor],trainA[Target])
+    pred = DT.predict(testA[Predictor])
+    acca = np.mean(testA[Target]==pred)
+    acc.append([acca])    
+np.mean(acc) #0.57
+
+### Naive Bayes Model ###
+acc = []    
+for i in range(3,14,2):
+    trainA, testA = train_test_split(final_loan, test_size = 0.3)
+    gnb = GaussianNB()
+    ignb = gnb.fit(trainA[Predictor],trainA[Target])
+    pred = ignb.predict(testA[Predictor])
+    acca = np.mean(testA[Target]==pred)
+    acc.append([acca]) 
+np.mean(acc) #59%
+
+acc1 = []    
+for i in range(3,14,2):
+    trainA, testA = train_test_split(final_loan, test_size = 0.3)
+    mnb = MultinomialNB()
+    ignb = gnb.fit(trainA[Predictor],trainA[Target])
+    pred = ignb.predict(testA[Predictor])
+    acca = np.mean(testA[Target]==pred)
+    acc1.append([acca]) 
+np.mean(acc1) #0.587
